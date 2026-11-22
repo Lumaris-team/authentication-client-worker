@@ -2,7 +2,7 @@ const TOKEN_TTL = 60;
 const WINDOW_SECONDS = 1800;
 const MAX_USERS_PER_IP = 5;
 const JWT_TTL = 1800; // 30 minutes
-const JWT_RENEW_INTERVAL = 600; // 10 minutes
+const JWT_RENEW_INTERVAL = 900; // one-time token lifetime: 15 minutes max
 const key = (kind, value) => new Request(`https://login-cache.invalid/${kind}/${encodeURIComponent(value)}`);
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -120,7 +120,7 @@ export default {
       
       // Verify one-time token
       const tokenRecord = await read(key("one-time-token", body.oneTimeToken));
-      if (!tokenRecord || tokenRecord.username !== body.username || tokenRecord.ip !== ip) {
+      if (!tokenRecord || tokenRecord.username !== body.username || tokenRecord.ip !== ip || tokenRecord.expires < Date.now()) {
         return notFound();
       }
       
