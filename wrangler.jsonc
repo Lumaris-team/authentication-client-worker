@@ -27,12 +27,6 @@
     }
   ],
 
-  // Static site
-  "assets": {
-    "directory": "./src/frontend",
-    "binding": "ASSETS"
-  },
-
   // Observability
   "observability": {
     "enabled": true,
