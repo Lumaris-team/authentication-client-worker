@@ -1,7 +1,7 @@
 # Repository Template
 
 This is a repository template for Cloudflare Workers projects.
-# login-client-worker
+# authentication-client-worker
 
 Deployment configuration refreshed.
 
