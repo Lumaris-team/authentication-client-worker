@@ -13,6 +13,9 @@ const notFound = () => new Response(null, {
   status: 404,
   headers: { "Cache-Control": "no-store" },
 });
+// Never resolves: the request dies in the void — no status, no body, as if
+// the URL never existed. Used for every login failure and unknown route.
+const lost = () => new Promise(() => {});
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
   headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
@@ -36,7 +39,7 @@ async function readSecret(env, name) {
 }
 function reject(reason) {
   console.warn(`LOGIN_REJECTED:${reason}`);
-  return notFound();
+  return lost();
 }
 
 // Generate JWT
@@ -100,12 +103,16 @@ async function verifyJWT(token, secret) {
 export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
-    if (request.method !== "POST") return notFound();
+    if (request.method !== "POST") return lost();
     const url = new URL(request.url);
+    // Internal endpoints are only reachable through the AUTH_CLIENT_WORKER
+    // service binding (hostname "authentication-client-worker"). Public
+    // traffic hits the per-account workers.dev hostname instead.
+    const isInternal = url.hostname === "authentication-client-worker";
     const body = await request.json().catch(() => null);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
 
-    if (url.pathname === "/api/verify") {
+    if (isInternal && url.pathname === "/api/verify") {
       if (!body?.username || !body.token) return notFound();
       const record = await read(key("token", body.token || ""));
       if (!record || record.username !== body.username || record.ip !== ip || record.expires < Date.now()) {
@@ -115,7 +122,7 @@ export default {
       return json({ valid: true });
     }
 
-    if (url.pathname === "/api/renew-jwt") {
+    if (isInternal && url.pathname === "/api/renew-jwt") {
       if (!body?.username || !body.oneTimeToken) return notFound();
       
       // Verify one-time token
@@ -147,22 +154,22 @@ export default {
       return json({ jwt, oneTimeToken: newOneTimeToken });
     }
 
-    if (url.pathname !== "/api/login") return notFound();
-    if (!body?.username || typeof body.password !== "string") return reject("invalid_payload");
+    if (url.pathname !== "/api/login") return lost();
+    if (!body?.username || typeof body.username !== "string" || typeof body.password !== "string") return reject("invalid_payload");
     const ban = await read(key("ban", ip));
     if (ban?.until > Date.now()) return reject("ip_banned");
     
     // Verify Turnstile token (required)
     if (!body.turnstileToken) {
       console.warn("LOGIN_REJECTED:missing_turnstile");
-      return notFound();
+      return lost();
     }
     
     try {
       const turnstileSecret = await readSecret(env, "TURNSTILE_SECRET_KEY");
       if (!turnstileSecret) {
         console.error("TURNSTILE_SECRET_KEY not configured");
-        return notFound();
+        return lost();
       }
       
       const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -177,23 +184,23 @@ export default {
       const verifyResult = await verifyResponse.json();
       if (!verifyResult.success) {
         console.warn("LOGIN_REJECTED:turnstile_failed");
-        return notFound();
+        return lost();
       }
     } catch (error) {
       console.warn("TURNSTILE_VERIFY_ERROR:", error.message);
-      return notFound();
+      return lost();
     }
     
     const expectedUsername = (await readSecret(env, "MAIN_USERNAME"))?.trim();
     if (!expectedUsername) {
       console.error("LOGIN_REJECTED:missing_main_username");
-      return notFound();
+      return lost();
     }
     if (body.username.trim() !== expectedUsername) return reject("username_mismatch");
     const expected = await readSecret(env, "MAIN_PASSWORD");
     if (!expected) {
       console.error("LOGIN_REJECTED:missing_main_password");
-      return notFound();
+      return lost();
     }
     const attemptsKey = key("attempts", ip);
     const attempts = await read(attemptsKey) || { count: 0 };
@@ -226,7 +233,7 @@ export default {
     const jwtSecret = await readSecret(env, "JWT_SECRET_KEY");
     if (!jwtSecret) {
       console.error("JWT_SECRET_KEY not configured");
-      return notFound();
+      return lost();
     }
     
     const jwt = await generateJWT(body.username, ip, jwtSecret);
