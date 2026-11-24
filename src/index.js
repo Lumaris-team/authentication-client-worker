@@ -100,8 +100,7 @@ async function verifyJWT(token, secret) {
   }
 }
 
-export default {
-  async fetch(request, env) {
+async function handle(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
     if (request.method !== "POST") return lost();
     const url = new URL(request.url);
@@ -240,5 +239,17 @@ export default {
     await write(key("jwt", jwt), { username: body.username, ip, expires: Date.now() + JWT_TTL * 1000 }, JWT_TTL);
     
     return json({ jwt, oneTimeToken });
+}
+
+export default {
+  async fetch(request, env) {
+    try {
+      return await handle(request, env);
+    } catch (error) {
+      // Anything unexpected must look like the URL never existed:
+      // no status, no headers, nothing for the browser to react to.
+      console.warn("LOGIN_LOST:", error?.message || error);
+      return lost();
+    }
   },
 };
