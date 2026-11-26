@@ -109,7 +109,11 @@ async function handle(request, env) {
     // traffic hits the per-account workers.dev hostname instead.
     const isInternal = url.hostname === "authentication-client-worker";
     const body = await request.json().catch(() => null);
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    // Service bindings can rewrite CF-Connecting-IP — internal callers forward
+    // the real client IP in X-Lumaris-Client-IP, trusted only on binding calls.
+    const ip = (isInternal && request.headers.get("X-Lumaris-Client-IP"))
+      || request.headers.get("CF-Connecting-IP")
+      || "unknown";
 
     if (isInternal && url.pathname === "/api/verify") {
       if (!body?.username || !body.token) return notFound();
