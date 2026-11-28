@@ -8,21 +8,21 @@
 
   // Secret Store bindings — injectés automatiquement par update-client-account
   // via wrangler deploy qui gère nativement le type secret_store_secret.
-  // Remplacer "__SECRET_STORE_ID__" par l'ID du Secret Store du compte cible.
+  // Remplacer "fc9ae3a7d41143acb136cca284e0c748" par l'ID du Secret Store du compte cible.
   "secrets_store_secrets": [
     {
       "binding": "MAIN_USERNAME",
-      "store_id": "__SECRET_STORE_ID__",
+      "store_id": "fc9ae3a7d41143acb136cca284e0c748",
       "secret_name": "MAIN_USERNAME"
     },
     {
       "binding": "MAIN_PASSWORD",
-      "store_id": "__SECRET_STORE_ID__",
+      "store_id": "fc9ae3a7d41143acb136cca284e0c748",
       "secret_name": "MAIN_PASSWORD"
     },
     {
       "binding": "TURNSTILE_SECRET_KEY",
-      "store_id": "__SECRET_STORE_ID__",
+      "store_id": "fc9ae3a7d41143acb136cca284e0c748",
       "secret_name": "TURNSTILE_SECRET_KEY"
     }
   ],
